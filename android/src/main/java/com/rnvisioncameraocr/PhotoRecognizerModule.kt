@@ -16,35 +16,44 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 class PhotoRecognizerModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
-   private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    init {
+        instance = this
+    }
+
+    companion object {
+        const val NAME = "PhotoRecognizerModule"
+        private var instance: PhotoRecognizerModule? = null
+
+        fun getContext(): ReactApplicationContext {
+            return instance?.reactApplicationContext
+                ?: throw IllegalStateException("PhotoRecognizerModule not initialized")
+        }
+    }
+
+    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     @ReactMethod
-    fun process(uri:String,promise:Promise){
+    fun process(uri: String, promise: Promise) {
         val parsedUri = Uri.parse(uri)
-        val data = WritableNativeMap()
-        val image = InputImage.fromFilePath(this.reactApplicationContext,parsedUri)
+        val image = InputImage.fromFilePath(reactApplicationContext, parsedUri)
         val task: Task<Text> = recognizer.process(image)
+        val data = WritableNativeMap()
+
         try {
             val text: Text = Tasks.await(task)
             if (text.text.isEmpty()) {
                 promise.resolve(WritableNativeMap())
+                return
             }
+
             data.putString("resultText", text.text)
             data.putArray("blocks", RNVisionCameraOCRPlugin.getBlocks(text.textBlocks))
-             promise.resolve(data)
+            promise.resolve(data)
         } catch (e: Exception) {
             e.printStackTrace()
-           promise.reject("Error", "Error processing image")
+            promise.reject("Error", "Error processing image")
         }
+    }
 
-    promise.resolve(true)
-
-    }
-    override fun getName(): String {
-        return NAME
-    }
-    companion object {
-        const val NAME = "PhotoRecognizerModule"
-    }
+    override fun getName(): String = NAME
 }
-
